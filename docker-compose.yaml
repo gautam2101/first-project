@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mysql:
+    image: mysql:8.0.43
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: appdb
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./store_files:/store_files_mysql/
+      - ./mysql.cnf:/etc/mysql/mysql.cnf
+    ports:
+      - "3306:3306"
+
+  
+  webserver:
+    image: apache/airflow:2.9.2-python3.9
+    restart: always
+    depends_on:
+      - postgres
+      - scheduler
+    environment:
+      LOAD_EX: "n"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__SMTP__SMTP_HOST: smtp.gmail.com
+      AIRFLOW__SMTP__SMTP_USER: er.kumargaut@gmail.com
+      AIRFLOW__SMTP__SMTP_PASSWORD: hdwiondmyyobhlto
+      AIRFLOW__SMTP__SMTP_PORT: 587
+      AIRFLOW__SMTP__SMTP_MAIL_FROM: Airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./store_files:/opt/airflow/store_files_airflow
+      - ./sql_files:/opt/airflow/sql_files
+      - ./webserver_config.py:/opt/airflow/webserver_config.py
+      # - ./plugins:/opt/airflow/plugins
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  scheduler:
+    image: apache/airflow:2.9.2-python3.9
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./store_files:/opt/airflow/store_files_airflow
+      - ./sql_files:/opt/airflow/sql_files
+    command: scheduler
+
+volumes:
+  postgres_data:
+  mysql_data:
